@@ -10,16 +10,17 @@ This is a library for a custom PCB that is meant to automatically control shades
 1. Locate an existing remote for your blinds and make sure it supports RTS (it should say something like that on the back)
 2. Hold the programming button on the back of your remote until the shade "jogs" (rapid up and down movement)
 3. Open the `PAIRING` settings menu on the interface, and press the `Send PROG` button. The shade should jog again to indicate that it's paired. If it doesn't, you may need to press the `Send PROG` button multiple times. Once the shade jogs, press the `Mark Paired` button to mark it as paired. (The device is unable to self-detect pairing as the RTS protocol is only one-way to the shade)
-4. Press the `Link Remote` button in the same menu, and then press any button on your existing remotes. For this step, the device will automatically detect the remote and mark it as linked. This will allow the device to receive signals from existing remotes so it can more accurately estimate position of the shade/blinds.
-5. Go back to `Home`, and then enter the `AUTOMATION` settings menu. Here, you can adjust the automation settings such as light sensor reading frequency, light level thresholds for shade up/down, and the time a certain light level must persist before the device sends a command to the shade. You may need to do some testing to find the right thresholds for your specific case.
+4. Measure the amount of time your shade takes to go up and down, and input those times in seconds into the corresponding text inputs (`Shade Up Time` and `Shade Down Time`). This will help with the shade position estimation.
+5. Press the `Link Remote` button in the same menu, and then press any button on your existing remotes. For this step, the device will automatically detect the remote and mark it as linked. This will allow the device to receive signals from existing remotes so it can more accurately estimate position of the shade/blinds.
+6. Go back to `Home`, and then enter the `AUTOMATION` settings menu. Here, you can adjust the automation settings such as light sensor reading frequency, light level thresholds for shade up/down, and the time a certain light level must persist before the device sends a command to the shade. You may need to do some testing to find the right thresholds for your specific case.
 
 ### Using the web UI
 1. Connect to the esp32's setup AP (named `AutoBlinds-XXXXXX`) and open `http://AutoBlinds.local` on your browser.
 2. Locate an existing remote for your blinds and make sure it supports RTS (it should say something like that on the back)
-3. Hold the programming button on the back of your remote until the shade "jogs" (rapid up and down movement)
-4. Press the `Send Prog` button on the web UI. The shade should jog again to indicate that it's paired. If it doesn't, you may need to press the `Send Prog` button multiple times. Once the shade jogs, press the `Mark Paired` button to mark it as paired. (The device is unable to self-detect pairing as the RTS protocol is only one-way to the shade).
-5. Press the `Learn Existing Remote` button and then press any button on your existing remote. The remote will appear under `Shade Settings`.
-6. Measure the amount of time your shade takes to go up and down, and input those times in seconds into the corresponding text inputs under `Shade Settings`.
+3. Measure the amount of time your shade takes to go up and down, and input those times in seconds into the corresponding text inputs under `Shade Settings`. This will help with the shade position estimation.
+4. Hold the programming button on the back of your remote until the shade "jogs" (rapid up and down movement)
+5. Press the `Send Prog` button on the web UI. The shade should jog again to indicate that it's paired. If it doesn't, you may need to press the `Send Prog` button multiple times. Once the shade jogs, press the `Mark Paired` button to mark it as paired. (The device is unable to self-detect pairing as the RTS protocol is only one-way to the shade).
+6. Press the `Learn Existing Remote` button and then press any button on your existing remote. The remote will appear under `Shade Settings`.
 7. Change the automation settings as you wish under `Automation`.
 
 ## Notes
