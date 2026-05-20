@@ -55,6 +55,14 @@ float clampPosition(float position) {
     return position;
 }
 
+uint32_t scaledTravelTime(const uint32_t fullTravelTime, const float startPosition, const float endPosition) {
+    const float distance = fabsf(clampPosition(endPosition) - clampPosition(startPosition));
+    if (fullTravelTime == 0 || distance <= 0.01f) return 0;
+
+    const float scaledTime = static_cast<float>(fullTravelTime) * (distance / 100.0f);
+    return static_cast<uint32_t>(std::max(1.0f, roundf(scaledTime)));
+}
+
 uint32_t defaultRemoteAddress() {
     uint32_t address = static_cast<uint32_t>(ESP.getEfuseMac() & 0xFFFFFF);
     if (address == 0) address = 0xA5A5A5;
@@ -442,10 +450,11 @@ void SomfyShade::loop() {
     if (direction == 0) return;
 
     const uint32_t elapsed = millis() - movementStartMillis;
-    const uint32_t travelTime = direction < 0 ? upTime : downTime;
+    const uint32_t travelTime = movementDurationMillis;
     if (travelTime == 0) {
         currentPos = target;
         direction = 0;
+        movementDurationMillis = 0;
         save();
         return;
     }
@@ -456,6 +465,7 @@ void SomfyShade::loop() {
     if (progress >= 1.0f) {
         currentPos = target;
         direction = 0;
+        movementDurationMillis = 0;
         save();
     }
 }
@@ -619,8 +629,17 @@ uint16_t SomfyShade::nextRollingCode() {
 
 void SomfyShade::startMovement(const float newTarget, const int8_t newDirection) {
     target = clampPosition(newTarget);
-    movementStartPosition = currentPos;
+    movementStartPosition = clampPosition(currentPos);
     movementStartMillis = millis();
+    movementDurationMillis = scaledTravelTime(newDirection < 0 ? upTime : downTime, movementStartPosition, target);
+
+    if (movementDurationMillis == 0) {
+        currentPos = target;
+        direction = 0;
+        save();
+        return;
+    }
+
     direction = newDirection;
     save();
 }

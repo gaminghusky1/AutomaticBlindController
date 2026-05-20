@@ -98,6 +98,7 @@ private:
     int8_t direction = 0;
     float movementStartPosition = 0.0f;
     uint32_t movementStartMillis = 0;
+    uint32_t movementDurationMillis = 0;
 
     uint16_t nextRollingCode();
     void startMovement(float newTarget, int8_t newDirection);
