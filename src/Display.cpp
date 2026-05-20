@@ -36,7 +36,7 @@ constexpr uint8_t BACKLIGHT_PWM_BITS = 8;
 constexpr uint8_t BACKLIGHT_BRIGHTNESS = 220;
 constexpr uint8_t BACKLIGHT_DIM_BRIGHTNESS = 45;
 
-constexpr uint32_t STATUS_REFRESH_MS = 2000;
+constexpr uint32_t STATUS_REFRESH_MS = 1000;
 constexpr uint32_t WIFI_SCAN_TIMEOUT_MS = 15000;
 constexpr uint32_t BACKLIGHT_DIM_AFTER_MS = 60000;
 constexpr uint32_t BACKLIGHT_OFF_AFTER_MS = BACKLIGHT_DIM_AFTER_MS + 10000;
@@ -180,6 +180,8 @@ enum class DisplayAction : uint8_t {
     AutoEditDownLux,
     AutoEditDownWait,
     AutoEditUpWait,
+    PairEditUpTime,
+    PairEditDownTime,
     AutoInputSave,
     AutoInputCancel
 };
@@ -190,7 +192,9 @@ enum class AutoField : uint8_t {
     UpLux,
     DownLux,
     DownWait,
-    UpWait
+    UpWait,
+    ShadeUpTime,
+    ShadeDownTime
 };
 
 LGFX tft;
@@ -219,6 +223,7 @@ lv_indev_drv_t touchDriver;
 lv_obj_t* luxLabel = nullptr;
 lv_obj_t* wifiLabel = nullptr;
 lv_obj_t* positionLabel = nullptr;
+lv_obj_t* autoCountdownLabel = nullptr;
 lv_obj_t* autoCheckbox = nullptr;
 lv_obj_t* pairingStatusLabel = nullptr;
 lv_obj_t* wifiConnectedLabel = nullptr;
@@ -515,7 +520,14 @@ const char* pageTitle() {
     }
 }
 
-void formatTopBarText(char* luxText, size_t luxSize, char* wifiText, size_t wifiSize, char* posText, size_t posSize) {
+void formatTopBarText(char* luxText,
+                      size_t luxSize,
+                      char* wifiText,
+                      size_t wifiSize,
+                      char* posText,
+                      size_t posSize,
+                      char* countdownText,
+                      size_t countdownSize) {
     const float lux = panelLightMeter ? panelLightMeter->getCurrentLux() : 0.0f;
     snprintf(luxText, luxSize, "Lux: %.0f", lux);
 
@@ -531,6 +543,17 @@ void formatTopBarText(char* luxText, size_t luxSize, char* wifiText, size_t wifi
 
     snprintf(posText, posSize, "%%" LV_SYMBOL_DOWN ": %d",
              somfyController ? somfyController->shade.transformPosition(somfyController->shade.currentPos) : 0);
+
+    countdownText[0] = '\0';
+    if (automationController) {
+        const int8_t statusCode = automationController->getStatusCode();
+        const unsigned long seconds = (automationController->getRemainingWaitTime() + 999UL) / 1000UL;
+        if (statusCode == 1) {
+            snprintf(countdownText, countdownSize, LV_SYMBOL_UP " in:%lus", seconds);
+        } else if (statusCode == 2) {
+            snprintf(countdownText, countdownSize, LV_SYMBOL_DOWN " in:%lus", seconds);
+        }
+    }
 }
 
 void updateTopBarInfo() {
@@ -539,11 +562,22 @@ void updateTopBarInfo() {
     char luxText[20];
     char wifiText[80];
     char posText[24];
-    formatTopBarText(luxText, sizeof(luxText), wifiText, sizeof(wifiText), posText, sizeof(posText));
+    char countdownText[24];
+    formatTopBarText(luxText,
+                     sizeof(luxText),
+                     wifiText,
+                     sizeof(wifiText),
+                     posText,
+                     sizeof(posText),
+                     countdownText,
+                     sizeof(countdownText));
 
     lv_label_set_text(luxLabel, luxText);
     lv_label_set_text(wifiLabel, wifiText);
     lv_label_set_text(positionLabel, posText);
+    if (autoCountdownLabel) {
+        lv_label_set_text(autoCountdownLabel, countdownText);
+    }
 }
 
 void updateAutomationCheckbox() {
@@ -646,6 +680,8 @@ const char* autoFieldTitle(const AutoField field) {
         case AutoField::DownLux: return "Down threshold (lux)";
         case AutoField::DownWait: return "Wait before down (s)";
         case AutoField::UpWait: return "Wait before up (s)";
+        case AutoField::ShadeUpTime: return "Shade up time (s)";
+        case AutoField::ShadeDownTime: return "Shade down time (s)";
         case AutoField::None:
         default:
             return "";
@@ -668,6 +704,12 @@ void formatAutoFieldValue(const AutoField field, char* buffer, const size_t size
             break;
         case AutoField::UpWait:
             snprintf(buffer, size, "%lu", automationController ? automationController->getUpWaitTime() / 1000UL : 30UL);
+            break;
+        case AutoField::ShadeUpTime:
+            snprintf(buffer, size, "%.1f", somfyShade ? somfyShade->upTime / 1000.0f : 10.0f);
+            break;
+        case AutoField::ShadeDownTime:
+            snprintf(buffer, size, "%.1f", somfyShade ? somfyShade->downTime / 1000.0f : 10.0f);
             break;
         case AutoField::None:
         default:
@@ -823,6 +865,12 @@ void startAutoFieldEdit(const DisplayAction action) {
         case DisplayAction::AutoEditUpWait:
             openAutoInputModal(AutoField::UpWait);
             break;
+        case DisplayAction::PairEditUpTime:
+            openAutoInputModal(AutoField::ShadeUpTime);
+            break;
+        case DisplayAction::PairEditDownTime:
+            openAutoInputModal(AutoField::ShadeDownTime);
+            break;
         default:
             break;
     }
@@ -906,6 +954,8 @@ void handleAction(const DisplayAction action) {
         case DisplayAction::AutoEditDownLux:
         case DisplayAction::AutoEditDownWait:
         case DisplayAction::AutoEditUpWait:
+        case DisplayAction::PairEditUpTime:
+        case DisplayAction::PairEditDownTime:
             startAutoFieldEdit(action);
             break;
         case DisplayAction::AutoInputSave:
@@ -1104,6 +1154,24 @@ void saveAutoInput() {
             }
             break;
         }
+        case AutoField::ShadeUpTime: {
+            const double adjusted = clampDouble(value, 0.1, 600.0);
+            clamped = adjusted != value;
+            if (somfyShade) {
+                somfyShade->upTime = static_cast<uint32_t>(adjusted * 1000.0);
+                somfyShade->save();
+            }
+            break;
+        }
+        case AutoField::ShadeDownTime: {
+            const double adjusted = clampDouble(value, 0.1, 600.0);
+            clamped = adjusted != value;
+            if (somfyShade) {
+                somfyShade->downTime = static_cast<uint32_t>(adjusted * 1000.0);
+                somfyShade->save();
+            }
+            break;
+        }
         case AutoField::None:
             break;
     }
@@ -1126,11 +1194,13 @@ void createTopBar(lv_obj_t* root) {
         createButton(topBar, 8, 8, 72, 40, "HOME", DisplayAction::PageHome);
         luxLabel = createLabel(topBar, "", 88, 17, 70, 18);
         wifiLabel = createLabel(topBar, "", 162, 17, 106, 18);
-        positionLabel = createLabel(topBar, "", 272, 17, 64, 18);
+        positionLabel = createLabel(topBar, "", 272, 6, 64, 18);
+        autoCountdownLabel = createLabel(topBar, "", 272, 31, 64, 16, true);
     } else {
         luxLabel = createLabel(topBar, "", 8, 17, 78, 18);
         wifiLabel = createLabel(topBar, "", 92, 17, 154, 18);
-        positionLabel = createLabel(topBar, "", 250, 17, 74, 18);
+        positionLabel = createLabel(topBar, "", 250, 6, 74, 18);
+        autoCountdownLabel = createLabel(topBar, "", 250, 31, 74, 16, true);
     }
 
     autoCheckbox = lv_checkbox_create(topBar);
@@ -1194,19 +1264,31 @@ void buildAutomationPage(lv_obj_t* root) {
 }
 
 void buildPairingPage(lv_obj_t* root) {
-    createLabel(root, "Pairing", 24, 72, 220, 30);
-    createButton(root, 24, 106, 200, 48, "Send PROG", DisplayAction::PairProg);
+    createLabel(root, "Pairing", 24, 64, 220, 26);
+
+    char valueText[24];
+    createLabel(root, "Shade up time", 24, 94, 205, 22, true);
+    formatAutoFieldValue(AutoField::ShadeUpTime, valueText, sizeof(valueText));
+    strlcat(valueText, " s", sizeof(valueText));
+    createButton(root, 292, 88, 150, 34, valueText, DisplayAction::PairEditUpTime);
+
+    createLabel(root, "Shade down time", 24, 132, 205, 22, true);
+    formatAutoFieldValue(AutoField::ShadeDownTime, valueText, sizeof(valueText));
+    strlcat(valueText, " s", sizeof(valueText));
+    createButton(root, 292, 126, 150, 34, valueText, DisplayAction::PairEditDownTime);
+
+    createButton(root, 24, 172, 200, 38, "Send PROG", DisplayAction::PairProg);
     createButton(root,
                  248,
-                 106,
+                 172,
                  200,
-                 48,
+                 38,
                  somfyShade && somfyShade->paired ? "Mark Unpaired" : "Mark Paired",
                  DisplayAction::PairToggle);
-    createButton(root, 24, 176, 200, 48, "Link Remote", DisplayAction::RemoteLearn);
-    createButton(root, 248, 176, 200, 48, "Clear Remote", DisplayAction::RemoteClear);
+    createButton(root, 24, 222, 200, 38, "Link Remote", DisplayAction::RemoteLearn);
+    createButton(root, 248, 222, 200, 38, "Clear Remote", DisplayAction::RemoteClear);
 
-    pairingStatusLabel = createLabel(root, "", 24, 238, 430, 56, true);
+    pairingStatusLabel = createLabel(root, "", 24, 270, 430, 42, true);
     updatePairingStatus();
 }
 
@@ -1290,6 +1372,7 @@ void buildScreen() {
     luxLabel = nullptr;
     wifiLabel = nullptr;
     positionLabel = nullptr;
+    autoCountdownLabel = nullptr;
     autoCheckbox = nullptr;
     pairingStatusLabel = nullptr;
     wifiConnectedLabel = nullptr;
