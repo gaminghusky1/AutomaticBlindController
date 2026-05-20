@@ -1,19 +1,6 @@
 # ESP32 Automatic Blinds
 
-Single-shade ESP32 controller for a Somfy RTS shade using a CC1101 transceiver and a BH1750 light sensor.
-
-## What this firmware does
-
-- Stores one RTS remote address, one rolling code, one paired state, and one estimated shade position.
-- Sends `up`, `down`, `my`, and `prog` RTS commands through the CC1101.
-- Keeps WiFi, mDNS, NTP, radio, shade, and automation settings in ESP32 NVS so they survive reboot.
-- Provides a small built-in web UI and touchscreen interface.
-- Runs light level based automatic open/close logic through `AutomaticBlindController.cpp`.
-
-## Default access
-
-- If WiFi is not configured or connection fails, the ESP32 opens a setup AP named `AutoBlinds-XXXXXX`.
-- After WiFi connects or after connecting to the setup AP, mDNS is available at `http://AutoBlinds.local` unless the hostname is changed.
+This is a library for a custom PCB that is meant to automatically control shades that use the Somfy RTS protocol or similar RF protocols. The PCB contains an ESP32, a CC1101 transceiver, a BH1750 light sensor, and a 3.5" IPS Capacitive touchscreen display from Hosyond.
 
 ## Initial Setup
 
@@ -38,3 +25,16 @@ Single-shade ESP32 controller for a Somfy RTS shade using a CC1101 transceiver a
 ## Notes
 
 The shade position is estimated from the commands sent by this ESP32 and the configured travel times.
+
+## Technical Details
+
+- Stores one RTS remote address, one rolling code, one paired state, and one estimated shade position.
+- Sends `up`, `down`, `my`, and `prog` RTS commands through the CC1101.
+- Keeps WiFi, mDNS, NTP, radio, shade, and automation settings in ESP32 NVS so they survive reboot.
+- Provides a small built-in web UI and touchscreen interface.
+- Runs light level based automatic open/close logic through `AutomaticBlindController.cpp`.
+
+## Default access
+
+- If WiFi is not configured or connection fails, the ESP32 opens a setup AP named `AutoBlinds-XXXXXX`.
+- After WiFi connects or after connecting to the setup AP, mDNS is available at `http://AutoBlinds.local` unless the hostname is changed.
